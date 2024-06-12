@@ -13,7 +13,7 @@ public:
     int    samples_per_pixel = 10;//每个像素的随机样本总数
     int    max_depth = 10;      //反弹到场景中的最大光线数量
     color  background;          // 场景的背景颜色
-    
+
     double vfov = 90;           //垂直视角
     point3 lookfrom = point3(0, 0, 0); // 点相机的视角
     point3 lookat = point3(0, 0, -1);  // 点相机的看向
@@ -22,22 +22,26 @@ public:
     double defocus_angle = 0;   //光圈开口角度
     double focus_dist = 10;     //焦点
 
-    void render(const hittable& world) 
+    void render(const hittable& world)
     {
         initialize();
 
         std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
-        for (int j = 0; j < image_height; j++) 
+        for (int j = 0; j < image_height; j++)
         {
             std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
-            for (int i = 0; i < image_width; i++) 
+            for (int i = 0; i < image_width; i++)
             {
                 color pixel_color(0, 0, 0);
-                for (int sample = 0; sample < samples_per_pixel; sample++)
+                //进行分层采样
+                for (int s_j = 0; s_j < sqrt_spp; ++s_j) 
                 {
-                    ray r = get_ray(i, j);
-                    pixel_color += ray_color(r, max_depth,world);
+                    for (int s_i = 0; s_i < sqrt_spp; ++s_i) 
+                    {
+                        ray r = get_ray(i, j, s_i, s_j);
+                        pixel_color += ray_color(r, max_depth, world);
+                    }
                 }
                 write_color(std::cout, pixel_samples_scale * pixel_color);
             }
@@ -57,11 +61,18 @@ private:
     vec3   defocus_disk_u; //散焦盘的水平半径
     vec3   defocus_disk_v; //散焦盘的垂直半径
 
+    int    sqrt_spp;             // 每像素样本数的平方根
+    double recip_sqrt_spp;       // 1 / sqrt_spp
+
     void initialize() {
         image_height = int(image_width / aspect_ratio);
         image_height = (image_height < 1) ? 1 : image_height;
 
-        pixel_samples_scale = 1.0 / samples_per_pixel;
+        //pixel_samples_scale = 1.0 / samples_per_pixel;
+
+        sqrt_spp = int(sqrt(samples_per_pixel));
+        pixel_samples_scale = 1.0 / (sqrt_spp * sqrt_spp);
+        recip_sqrt_spp = 1.0 / sqrt_spp;
 
         center = lookfrom;
 
@@ -77,15 +88,15 @@ private:
         v = cross(w, u);
 
         // 计算沿水平和垂直视口的大小
-        vec3 viewport_u = viewport_width * u;   
-        vec3 viewport_v = viewport_height * -v; 
+        vec3 viewport_u = viewport_width * u;
+        vec3 viewport_v = viewport_height * -v;
 
         // 计算从像素到像素的水平和垂直增量向量
         pixel_delta_u = viewport_u / image_width;
         pixel_delta_v = viewport_v / image_height;
 
         // 计算左上角像素的位置
-        auto viewport_upper_left = center - (focus_dist * w) - viewport_u/2 - viewport_v/2;
+        auto viewport_upper_left = center - (focus_dist * w) - viewport_u / 2 - viewport_v / 2;
         pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
 
 
@@ -96,20 +107,18 @@ private:
 
     }
 
-    ray get_ray(int i, int j)const
+    ray get_ray(int i, int j, int s_i, int s_j)const
     {
         //构造一条来自散焦盘并指向随机的光线
-        //在i和j的周围
-        auto offset = sample_square();
-        auto pixel_sample = pixel00_loc
-                             + ((i + offset.x()) * pixel_delta_u)
-                             + ((j + offset.y()) * pixel_delta_v);
+        //在(i,j)像素的周围进行采用
+        auto pixel_center = pixel00_loc + (i * pixel_delta_u) + (j * pixel_delta_v);
+        auto pixel_sample = pixel_center + pixel_sample_square(s_i, s_j);
 
         auto ray_origin = (defocus_angle <= 0) ? center : defocus_disk_sample();
         auto ray_direction = pixel_sample - ray_origin;
         auto ray_time = random_double();
 
-        return ray(ray_origin, ray_direction,ray_time);
+        return ray(ray_origin, ray_direction, ray_time);
     }
 
     vec3 sample_square()const
@@ -125,9 +134,9 @@ private:
         return center + (p[0] * defocus_disk_u) + (p[1] * defocus_disk_v);
     }
 
-	color ray_color(const ray& r, int depth, const hittable& world)const
-	{
-		hit_record rec;
+    color ray_color(const ray& r, int depth, const hittable& world)const
+    {
+        hit_record rec;
 
         if (depth <= 0)
             return color(0, 0, 0);
@@ -145,6 +154,13 @@ private:
         color color_from_scatter = attenuation * ray_color(scattered, depth - 1, world);
 
         return color_from_emission + color_from_scatter;
-	}
+    }
 
+    vec3 pixel_sample_square(int s_i, int s_j) const 
+    {
+        // 给定两个子像素索引，返回原点像素周围正方形中的随机点。
+        auto px = -0.5 + recip_sqrt_spp * (s_i + random_double());
+        auto py = -0.5 + recip_sqrt_spp * (s_j + random_double());
+        return (px * pixel_delta_u) + (py * pixel_delta_v);
+    }
 };
