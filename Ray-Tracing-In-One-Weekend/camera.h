@@ -35,9 +35,9 @@ public:
             {
                 color pixel_color(0, 0, 0);
                 //进行分层采样
-                for (int s_j = 0; s_j < sqrt_spp; ++s_j) 
+                for (int s_j = 0; s_j < sqrt_spp; ++s_j)
                 {
-                    for (int s_i = 0; s_i < sqrt_spp; ++s_i) 
+                    for (int s_i = 0; s_i < sqrt_spp; ++s_i)
                     {
                         ray r = get_ray(i, j, s_i, s_j);
                         pixel_color += ray_color(r, max_depth, world);
@@ -111,8 +111,10 @@ private:
     {
         //构造一条来自散焦盘并指向随机的光线
         //在(i,j)像素的周围进行采用
-        auto pixel_center = pixel00_loc + (i * pixel_delta_u) + (j * pixel_delta_v);
-        auto pixel_sample = pixel_center + pixel_sample_square(s_i, s_j);
+        auto offset = sample_square_stratified(s_i, s_j);
+        auto pixel_sample = pixel00_loc
+            + ((i + offset.x()) * pixel_delta_u)
+            + ((j + offset.y()) * pixel_delta_v);
 
         auto ray_origin = (defocus_angle <= 0) ? center : defocus_disk_sample();
         auto ray_direction = pixel_sample - ray_origin;
@@ -151,16 +153,22 @@ private:
         if (!rec.mat->scatter(r, rec, attenuation, scattered))
             return color_from_emission;
 
-        color color_from_scatter = attenuation * ray_color(scattered, depth - 1, world);
+        //color color_from_scatter = attenuation * ray_color(scattered, depth - 1, world);
+        double scattering_pdf = rec.mat->scattering_pdf(r, rec, scattered);
+        double pdf = scattering_pdf;
+        //double pdf = 1 / (2 * pi);
+
+        color color_from_scatter = (attenuation * scattering_pdf * ray_color(scattered, depth - 1, world)) / pdf;
 
         return color_from_emission + color_from_scatter;
     }
 
-    vec3 pixel_sample_square(int s_i, int s_j) const 
+    vec3 sample_square_stratified(int s_i, int s_j) const
     {
         // 给定两个子像素索引，返回原点像素周围正方形中的随机点。
-        auto px = -0.5 + recip_sqrt_spp * (s_i + random_double());
-        auto py = -0.5 + recip_sqrt_spp * (s_j + random_double());
-        return (px * pixel_delta_u) + (py * pixel_delta_v);
+        auto px = ((s_i + random_double()) * recip_sqrt_spp) - 0.5;
+        auto py = ((s_j + random_double()) * recip_sqrt_spp) - 0.5;
+
+        return vec3(px, py, 0);
     }
 };

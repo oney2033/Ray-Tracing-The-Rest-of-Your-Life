@@ -83,6 +83,9 @@
     <ClInclude Include="constant_medium.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="onb.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\Image.jpg">
