@@ -19,21 +19,27 @@
 
 using namespace std;
 
-double f(double d) {
-    return 8.0 * pow(d, 1.0 / 3.0);
+double f(const vec3& d)
+{
+	auto cos_theta = d.z();
+	return cos_theta * cos_theta * cos_theta;
 }
 
-double pdf(double x) {
-    return (3.0 / 8.0) * x * x;
+double pdf(const vec3& d)
+{
+	return d.z() / pi;
 }
 
-int main() {
-    int N = 1;
-    auto sum = 0.0;
-    for (int i = 0; i < N; i++) {
-        auto x = f(random_double());
-        sum += x * x / pdf(x);
-    }
-    std::cout << std::fixed << std::setprecision(12);
-    std::cout << "I = " << sum / N << '\n';
+int main() 
+{
+	int N = 1000000;
+	auto sum = 0.0;
+	for (int i = 0; i < N; i++)
+	{
+		vec3 d = random_cosine_direction();
+		sum += f(d) / pdf(d);
+	}
+	std::cout << std::fixed << std::setprecision(12);
+	std::cout << "PI/2 = " << pi / 2.0 << '\n';
+	std::cout << "Estimate = " << sum / N << '\n';
 }

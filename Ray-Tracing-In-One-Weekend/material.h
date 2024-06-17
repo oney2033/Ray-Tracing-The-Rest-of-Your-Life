@@ -45,7 +45,7 @@ public:
 
     double scattering_pdf(const ray& r_in, const hit_record& rec, const ray& scattered) const
     {
-        //auto cos_theta = dot(rec.normal, unit_vector(scattered.direction()));
+       // auto cos_theta = dot(rec.normal, unit_vector(scattered.direction()));
         //return cos_theta < 0 ? 0 : cos_theta / pi;
         return 1 / (2 * pi);
     }
