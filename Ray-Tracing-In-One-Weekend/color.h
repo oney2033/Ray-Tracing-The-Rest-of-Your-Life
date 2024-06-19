@@ -18,7 +18,13 @@ void write_color(std::ostream& out, const color& pixel_color)
     auto g = pixel_color.y();
     auto b = pixel_color.z();
 
-    // Apply a linear to gamma transform for gamma 2
+    // 将NaN的值替换为0
+    if (r != r) r = 0.0;
+    if (g != g) g = 0.0;
+    if (b != b) b = 0.0;
+
+
+    // Apply a linear to gamma transform for gamma 2,伽马校正
     r = linear_to_gamma(r);
     g = linear_to_gamma(g);
     b = linear_to_gamma(b);
