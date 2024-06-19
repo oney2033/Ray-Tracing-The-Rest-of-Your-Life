@@ -4,14 +4,14 @@
 #include"ray.h"
 #include"hittable.h"
 #include"texture.h"
-
+#include"onb.h"
 
 class material
 {
 public:
     virtual ~material() = default;
     virtual bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered) const = 0;
-    virtual color emitted(double u, double v, const point3& p) const
+    virtual color emitted(const ray& r_in, const hit_record& rec, double u, double v, const point3& p) const
     {
         return color(0, 0, 0);
     }
@@ -31,23 +31,24 @@ public:
     {
 
         //auto scatter_direction = rec.normal + random_unit_vector();
+        onb uvw;
+        uvw.build_from_w(rec.normal);
+        auto scatter_direction = uvw.local(random_cosine_direction());
 
-        auto scatter_direction = random_on_hemisphere(rec.normal);
+      //  // 当向量在所有维度都非常接近0时
+      //  if (scatter_direction.near_zero())
+      //      scatter_direction = rec.normal;
 
-        // 当向量在所有维度都非常接近0时
-        if (scatter_direction.near_zero())
-            scatter_direction = rec.normal;
-
-        scattered = ray(rec.p, scatter_direction, r_in.time());
+        scattered = ray(rec.p, unit_vector(scatter_direction), r_in.time());
         attenuation = tex->value(rec.u, rec.v, rec.p);
         return true;
     }
 
     double scattering_pdf(const ray& r_in, const hit_record& rec, const ray& scattered) const
     {
-       // auto cos_theta = dot(rec.normal, unit_vector(scattered.direction()));
-        //return cos_theta < 0 ? 0 : cos_theta / pi;
-        return 1 / (2 * pi);
+        auto cos_theta = dot(rec.normal, unit_vector(scattered.direction()));
+        return cos_theta < 0 ? 0 : cos_theta / pi;
+        //return 1 / (2 * pi);
     }
 
 private:
@@ -122,8 +123,10 @@ public:
         return false;
     }
 
-    color emitted(double u, double v, const point3& p) const override
+    color emitted(const ray& r_in, const hit_record& rec, double u, double v, const point3& p)const override 
     {
+        if (!rec.front_face)
+            return color(0, 0, 0);
         return emit->value(u, v, p);
     }
 
@@ -142,6 +145,11 @@ public:
         scattered = ray(rec.p, random_unit_vector(), r_in.time());
         attenuation = albedo->value(rec.u, rec.v, rec.p);
         return true;
+    }
+
+    double scattering_pdf(const ray& r_in, const hit_record& rec, const ray& scattered)const override 
+{
+        return 1 / (4 * pi);
     }
 
 private:
